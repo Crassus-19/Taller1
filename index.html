@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Taller</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1, h2 {
+      text-align: center;
+    }
+
+    form {
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    input, select, textarea, button {
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+
+    th, td {
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #f4f4f4;
+    }
+
+    button {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gestión de Taller</h1>
+  
+  <form id="registroForm">
+    <label>Unidad:</label>
+    <input type="text" id="unidad" placeholder="Ejemplo: Unidad 123" required />
+
+    <label>Seleccionar Medida:</label>
+    <select id="tipoMedida" required>
+      <option value="Kilometraje">Kilometraje</option>
+      <option value="Horas">Horas</option>
+    </select>
+
+    <label>Valor (Kilometraje u Horas):</label>
+    <input type="text" id="kilometrajeHoras" placeholder="Ejemplo: 45000 km o 5 hrs" required />
+
+    <label>Tipo de Orden:</label>
+    <select id="tipoOrden" required>
+      <option value="Mantenimiento">Mantenimiento</option>
+      <option value="Reparación">Reparación</option>
+      <option value="Otro">Otro</option>
+    </select>
+
+    <label>Comentarios:</label>
+    <textarea id="comentarios" placeholder="Detalles adicionales"></textarea>
+
+    <label>Quién Reporta:</label>
+    <input type="text" id="reporta" placeholder="Nombre de quien reporta" required />
+
+    <button type="submit">Guardar Registro</button>
+  </form>
+
+  <h2>Registros</h2>
+  <table id="registrosTable">
+    <thead>
+      <tr>
+        <th>Folio</th>
+        <th>Unidad</th>
+        <th>Medida</th>
+        <th>Valor</th>
+        <th>Fecha</th>
+        <th>Tipo de Orden</th>
+        <th>Comentarios</th>
+        <th>Reporta</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Registros aquí -->
+    </tbody>
+  </table>
+
+  <script>
+    // Función para obtener y mostrar registros
+    async function cargarRegistros() {
+      const response = await fetch("/api/registros");
+      const registros = await response.json();
+
+      const tbody = document.querySelector("#registrosTable tbody");
+      tbody.innerHTML = registros
+        .map(
+          (r) => `
+          <tr>
+            <td>${r.folio}</td>
+            <td>${r.unidad}</td>
+            <td>${r.tipoMedida}</td>
+            <td>${r.kilometrajeHoras}</td>
+            <td>${r.fecha}</td>
+            <td>${r.tipoOrden}</td>
+            <td>${r.comentarios}</td>
+            <td>${r.reporta}</td>
+            <td>
+              <a href="/api/registros/${r.folio}/pdf" target="_blank">
+                <button>Imprimir PDF</button>
+              </a>
+            </td>
+          </tr>
+        `
+        )
+        .join("");
+    }
+
+    // Función para guardar un nuevo registro
+    document.getElementById("registroForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const data = {
+        unidad: document.getElementById("unidad").value,
+        tipoMedida: document.getElementById("tipoMedida").value,
+        kilometrajeHoras: document.getElementById("kilometrajeHoras").value,
+        tipoOrden: document.getElementById("tipoOrden").value,
+        comentarios: document.getElementById("comentarios").value,
+        reporta: document.getElementById("reporta").value,
+      };
+
+      const response = await fetch("/api/registros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      alert(`Registro guardado con éxito. Folio: ${result.folio}, Fecha: ${result.fecha}`);
+      cargarRegistros(); // Actualizar tabla
+    });
+
+    // Cargar registros al iniciar la página
+    cargarRegistros();
+  </script>
+</body>
+</html>
