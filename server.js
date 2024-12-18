@@ -114,32 +114,56 @@ app.get("/api/registros/:folio/pdf", (req, res) => {
   const { folio } = req.params;
 
   db.get("SELECT * FROM registros WHERE folio = ?", [folio], (err, row) => {
-    if (err || !row) {
-      console.error("Registro no encontrado:", err?.message);
-      return res.status(404).json({ error: "Registro no encontrado" });
-    }
+    if (err || !row) return res.status(500).json({ error: "Registro no encontrado" });
 
     const doc = new PDFDocument({ margin: 40 });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=registro_${folio}.pdf`);
     doc.pipe(res);
 
-    doc.fontSize(20).text("Reporte de Taller", { align: "center" });
-    doc.moveTo(50, 100).lineTo(550, 100).stroke();
-    doc.fontSize(12);
-    doc.text(`Fecha: ${row.fecha}`, 50, 120);
-    doc.text(`Folio: ${row.folio}`, 450, 120);
+    // Función para escribir contenido en el PDF
+    function escribirContenido(yOffset) {
+      const logoPath = path.join(__dirname, "logo_fletes_tauro.png");
+      if (fs.existsSync(logoPath)) {
+        doc.save();
+        doc.fillOpacity(0.35);
+        doc.image(logoPath, 70, 25 + yOffset, { width: 500 });
+        doc.restore();
+      }
 
-    doc.moveDown(1);
-    doc.text(`Unidad: ${row.unidad}`);
-    doc.text(`${row.tipoMedida}: ${row.kilometrajeHoras}`);
-    doc.text(`Tipo de Orden: ${row.tipoOrden}`);
-    doc.text(`Quién Reporta: ${row.reporta}`);
+      doc.font("Helvetica-Bold").fontSize(20).text("Reporte de Taller", { align: "center" });
+      doc.moveTo(50, 100 + yOffset).lineTo(550, 100 + yOffset).stroke();
 
-    doc.moveDown(1);
-    doc.text("Comentarios:");
-    doc.rect(50, doc.y, 500, 100).stroke();
-    doc.text(row.comentarios, 60, doc.y + 10);
+      doc.fontSize(12).text(`Fecha: ${row.fecha}`, 50, 80 + yOffset, { align: "left" });
+      doc.text(`Folio: ${row.folio}`, 450, 80 + yOffset, { align: "right" });
+
+      doc.moveDown(1);
+      doc.font("Helvetica-Bold").text("Unidad:", 50, doc.y, { align: "left" });
+      doc.font("Helvetica").text(row.unidad, 150, doc.y - 15);
+
+      doc.font("Helvetica-Bold").text(`${row.tipoMedida}:`, 50, doc.y, { align: "left" });
+      doc.font("Helvetica").text(row.kilometrajeHoras, 150, doc.y - 15);
+
+      doc.font("Helvetica-Bold").text("Tipo de Orden:", 50, doc.y, { align: "left" });
+      doc.font("Helvetica").text(row.tipoOrden, 150, doc.y - 15);
+
+      doc.font("Helvetica-Bold").text("Quién Reporta:", 50, doc.y, { align: "left" });
+      doc.font("Helvetica").text(row.reporta, 150, doc.y - 15);
+
+      doc.moveDown(1);
+      doc.rect(50, doc.y, 500, 80).stroke();
+      doc.font("Helvetica-Bold").text("Comentarios:", 60, doc.y + 10, { align: "left" });
+      doc.font("Helvetica").text(row.comentarios, 60, doc.y + 10);
+
+      doc.moveDown(2);
+      doc.moveTo(200, doc.y + 30).lineTo(400, doc.y + 30).stroke();
+      doc.font("Helvetica-Bold").fontSize(12).text("Firma", 50, doc.y + 40, { align: "center" });
+      doc.moveDown(8);
+    }
+
+    // Escribir contenido duplicado en la misma página
+    escribirContenido(0);
+    escribirContenido(400);
 
     doc.end();
   });
