@@ -5,17 +5,23 @@ const PDFDocument = require("pdfkit");
 const fs = require("fs");
 
 const app = express();
-const PORT = 8080;
+const PORT = process.env.PORT || 8080; // Ajustar al puerto de Azure App Service
 
 // Middleware
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, "public"))); // Carpeta pública para archivos estáticos
+
+// Log de solicitudes HTTP
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // Base de datos SQLite
 const db = new sqlite3.Database("./database.db", (err) => {
   if (err) {
     console.error("Error al conectar a SQLite:", err.message);
-    return;
+    process.exit(1); // Detener el servidor si hay un error crítico
   }
   console.log("Conexión a SQLite exitosa.");
 });
@@ -36,7 +42,7 @@ db.serialize(() => {
   `);
 });
 
-// Ruta para servir el archivo HTML principal
+// Ruta principal para verificar que el servidor está en ejecución
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
@@ -45,12 +51,10 @@ app.get("/", (req, res) => {
 app.get("/api/registros", (req, res) => {
   const { unidad, tipoOrden, fecha, sortBy, order } = req.query;
 
-  // Base de la consulta
   let query = "SELECT * FROM registros";
   const params = [];
-
-  // Aplicar filtros dinámicamente
   const conditions = [];
+
   if (unidad) {
     conditions.push("unidad LIKE ?");
     params.push(`%${unidad}%`);
@@ -68,7 +72,6 @@ app.get("/api/registros", (req, res) => {
     query += ` WHERE ${conditions.join(" AND ")}`;
   }
 
-  // Aplicar ordenamiento
   if (sortBy) {
     const validColumns = ["folio", "fecha", "unidad"];
     if (validColumns.includes(sortBy)) {
@@ -76,7 +79,6 @@ app.get("/api/registros", (req, res) => {
     }
   }
 
-  // Ejecutar la consulta
   db.all(query, params, (err, rows) => {
     if (err) {
       console.error("Error al obtener registros:", err.message);
@@ -89,8 +91,11 @@ app.get("/api/registros", (req, res) => {
 // Ruta para guardar un nuevo registro
 app.post("/api/registros", (req, res) => {
   const { unidad, tipoMedida, kilometrajeHoras, tipoOrden, comentarios, reporta } = req.body;
-  const fecha = new Date().toISOString().split("T")[0];
+  if (!unidad || !tipoMedida || !kilometrajeHoras || !tipoOrden || !reporta) {
+    return res.status(400).json({ error: "Todos los campos son obligatorios" });
+  }
 
+  const fecha = new Date().toISOString().split("T")[0];
   db.run(
     "INSERT INTO registros (unidad, tipoMedida, kilometrajeHoras, fecha, tipoOrden, comentarios, reporta) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [unidad, tipoMedida, kilometrajeHoras, fecha, tipoOrden, comentarios, reporta],
@@ -109,17 +114,18 @@ app.get("/api/registros/:folio/pdf", (req, res) => {
   const { folio } = req.params;
 
   db.get("SELECT * FROM registros WHERE folio = ?", [folio], (err, row) => {
-    if (err || !row) return res.status(500).json({ error: "Registro no encontrado" });
+    if (err || !row) {
+      console.error("Registro no encontrado:", err?.message);
+      return res.status(404).json({ error: "Registro no encontrado" });
+    }
 
     const doc = new PDFDocument({ margin: 40 });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=registro_${folio}.pdf`);
     doc.pipe(res);
 
-    // Contenido del PDF
     doc.fontSize(20).text("Reporte de Taller", { align: "center" });
     doc.moveTo(50, 100).lineTo(550, 100).stroke();
-
     doc.fontSize(12);
     doc.text(`Fecha: ${row.fecha}`, 50, 120);
     doc.text(`Folio: ${row.folio}`, 450, 120);
@@ -139,7 +145,13 @@ app.get("/api/registros/:folio/pdf", (req, res) => {
   });
 });
 
-// Servidor escuchando
+// Middleware de manejo de errores
+app.use((err, req, res, next) => {
+  console.error("Error en el servidor:", err.message);
+  res.status(500).json({ error: "Error interno del servidor" });
+});
+
+// Iniciar el servidor
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
