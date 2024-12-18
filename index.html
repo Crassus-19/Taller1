@@ -15,21 +15,28 @@
       text-align: center;
     }
 
+    /* Estilo para formularios */
     form {
       margin-bottom: 20px;
       display: flex;
       flex-direction: column;
       gap: 10px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     input, select, textarea, button {
       padding: 10px;
       font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
+      margin-top: 10px;
     }
 
     table, th, td {
@@ -48,11 +55,45 @@
     button {
       cursor: pointer;
     }
+
+    /* Estilo para filtros en una sola fila */
+    #filtroForm {
+      display: flex;
+      flex-wrap: nowrap;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      max-width: 1000px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    #filtroForm input, #filtroForm select, #filtroForm button {
+      padding: 8px 12px;
+      font-size: 14px;
+      min-width: 150px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    #filtroForm button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    #filtroForm button:hover {
+      background-color: #45a049;
+    }
   </style>
 </head>
 <body>
   <h1>Gestión de Taller</h1>
-  
+
+  <!-- Formulario para hacer registros -->
+  <h2>Registrar Nuevo</h2>
   <form id="registroForm">
     <label>Unidad:</label>
     <input type="text" id="unidad" placeholder="Ejemplo: Unidad 123" required />
@@ -82,6 +123,26 @@
     <button type="submit">Guardar Registro</button>
   </form>
 
+  <!-- Filtros para ordenar registros -->
+  <h2>Filtrar y Ordenar Registros</h2>
+  <form id="filtroForm">
+    <input type="text" id="filtroUnidad" placeholder="Filtrar por Unidad" />
+    <input type="text" id="filtroTipoOrden" placeholder="Filtrar por Tipo de Orden" />
+    <input type="date" id="filtroFecha" />
+    <select id="filtroSortBy">
+      <option value="">Ordenar por...</option>
+      <option value="folio">Folio</option>
+      <option value="fecha">Fecha</option>
+      <option value="unidad">Unidad</option>
+    </select>
+    <select id="filtroOrder">
+      <option value="asc">Ascendente</option>
+      <option value="desc">Descendente</option>
+    </select>
+    <button type="submit">Aplicar Filtros</button>
+  </form>
+
+  <!-- Tabla para mostrar registros -->
   <h2>Registros</h2>
   <table id="registrosTable">
     <thead>
@@ -98,14 +159,15 @@
       </tr>
     </thead>
     <tbody>
-      <!-- Registros aquí -->
+      <!-- Los registros se mostrarán aquí -->
     </tbody>
   </table>
 
   <script>
-    // Función para obtener y mostrar registros
-    async function cargarRegistros() {
-      const response = await fetch("/api/registros");
+    // Función para cargar registros dinámicamente
+    async function cargarRegistros(filtros = {}) {
+      const query = new URLSearchParams(filtros).toString();
+      const response = await fetch(`/api/registros?${query}`);
       const registros = await response.json();
 
       const tbody = document.querySelector("#registrosTable tbody");
@@ -132,7 +194,7 @@
         .join("");
     }
 
-    // Función para guardar un nuevo registro
+    // Guardar un nuevo registro
     document.getElementById("registroForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
@@ -145,18 +207,32 @@
         reporta: document.getElementById("reporta").value,
       };
 
-      const response = await fetch("/api/registros", {
+      await fetch("/api/registros", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
 
-      const result = await response.json();
-      alert(`Registro guardado con éxito. Folio: ${result.folio}, Fecha: ${result.fecha}`);
-      cargarRegistros(); // Actualizar tabla
+      alert("Registro guardado con éxito.");
+      cargarRegistros();
     });
 
-    // Cargar registros al iniciar la página
+    // Aplicar filtros
+    document.getElementById("filtroForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const filtros = {
+        unidad: document.getElementById("filtroUnidad").value,
+        tipoOrden: document.getElementById("filtroTipoOrden").value,
+        fecha: document.getElementById("filtroFecha").value,
+        sortBy: document.getElementById("filtroSortBy").value,
+        order: document.getElementById("filtroOrder").value,
+      };
+
+      cargarRegistros(filtros);
+    });
+
+    // Cargar registros al inicio
     cargarRegistros();
   </script>
 </body>
